@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ExamView } from "./exam";
 import { Experiments } from "./experiments";
 import { QuestionFigure } from "./lib/question-figures";
-import { MiniSheet } from "./lib/mini-sheet";
-import { sheetDrills } from "./lib/sheet-tasks";
 import { experimentCount, lessons } from "./lib/lessons";
 import type { Area, ExamRow, Lesson, QuestionResult, Submission, StudentRecord, Summary, UnderstandingLevel } from "./lib/types";
 import { COIN, DIFFICULTY, attitudeScore, levelOf, part } from "./lib/progress";
@@ -845,14 +843,6 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              {sheetDrills[lesson.id] && (
-                <MiniSheet
-                  lessonId={lesson.id}
-                  data={sheetDrills[lesson.id].data}
-                  tasks={sheetDrills[lesson.id].tasks}
-                  caption={sheetDrills[lesson.id].caption}
-                />
-              )}
             </div>
           ) : (
             <div className="theory-box">
@@ -1442,13 +1432,11 @@ export default function Home() {
                 if (!lesson) return null;
                 const last = lesson.theory.length;
                 const label =
-                  hint.kind === "式"
-                    ? "応用の表計算"
-                    : hint.kind === "語句"
-                      ? "重要語句テスト"
-                      : hint.index === last
-                        ? "応用"
-                        : `実験${hint.index + 1}`;
+                  hint.kind === "語句"
+                    ? "重要語句テスト"
+                    : hint.index === last
+                      ? "応用"
+                      : `実験${hint.index + 1}`;
                 const owned = !!boughtHints[hint.id];
                 const short = COIN.hint - balance;
                 return (

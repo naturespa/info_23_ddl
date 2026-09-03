@@ -1,4 +1,4 @@
-// 有料ヒントの一覧（デジタル分野37個：実験26＋重要語句11）。
+// 有料ヒントの一覧（37個：実験のヒント26 ＋ 重要語句の最初の1文字11）。
 // 中身は出しません。「どの単元のどの実験にヒントがあるか」だけを持ちます。
 
 export type HintEntry = {
@@ -9,8 +9,8 @@ export type HintEntry = {
   index: number;
   /** その実験の見出し */
   title: string;
-  /** 実験のヒント／応用の表計算の「式を見る」／重要語句テストの「最初の1文字」 */
-  kind: "実験" | "式" | "語句";
+  /** 実験のヒント／重要語句テストの「最初の1文字」 */
+  kind: "実験" | "語句";
 };
 
 const experimentHints: HintEntry[] = [
@@ -43,10 +43,6 @@ const experimentHints: HintEntry[] = [
   { id: "compress-2-1", lessonId: "compress", index: 2, title: "ランレングス法で文字列を圧縮する", kind: "実験" },
 ];
 
-/** 応用ミッションの表計算で、見本の式を出すぶん（データ活用の8単元） */
-const sheetHints: HintEntry[] = [
-];
-
 /** 重要語句テストの「最初の1文字」。単元ごとに1つ買うと、その単元の5語ぶん出る */
 const wordHints: HintEntry[] = [
   { id: "word-feature", lessonId: "feature", index: -2, title: "重要語句の最初の1文字（5語ぶん）", kind: "語句" },
@@ -62,10 +58,7 @@ const wordHints: HintEntry[] = [
   { id: "word-compress", lessonId: "compress", index: -2, title: "重要語句の最初の1文字（5語ぶん）", kind: "語句" },
 ];
 
-export const hintList: HintEntry[] = [...experimentHints, ...sheetHints, ...wordHints];
-
-/** 表計算の式のぶんだけ取り出す */
-export const sheetHintId = (lessonId: string, taskIndex: number) => `sheet-${lessonId}-${taskIndex}`;
+export const hintList: HintEntry[] = [...experimentHints, ...wordHints];
 
 /** 重要語句の「最初の1文字」のID */
 export const wordHintId = (lessonId: string) => `word-${lessonId}`;

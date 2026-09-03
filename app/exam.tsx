@@ -61,15 +61,16 @@ const WARN_SECONDS = 5 * 60;
  *   本試験 … そのクラスのもの
  *   追試   … その生徒専用。パスワードに本人の4桁番号が混ざるので、他人の端末では開かない
  */
-const EXAM_CLASS_FILES = [1, 2, 3, 4, 5, 6, 7];
+// 実在する分野別テストのファイルだけ（2組・3組・5組・6組は用意していないので載せない）
+const EXAM_CLASS_FILES = [1, 4, 7];
 
 const candidateFiles = (classNo: ClassNo, studentCode: string) => [
   // デモ用の番号は、まず「デモ用の短いセット（20問・10分）」を探す
   ...(isDemoCode(studentCode) ? [{ file: "digital-demo", makeup: false }] : []),
   ...(isTeacherCode(studentCode) ? [{ file: "digital-teacher", makeup: false }] : []),
-  // 自分の組の本試験を先に試し、そのあと他の組のファイルも試す。
-  // （2・3年次は組の番号が問題ファイルの組と一致しないことがあるため。
-  //   復号できるのは正しいパスワードのファイルだけなので、順に試しても安全）
+  // 自分の組の本試験を先に試し、そのあと実在する他のファイル（c1・c4・c7）も試す。
+  // 2・3年次は在籍する組がとびとびなので、組番号とファイル名は一致しないことがある。
+  //   復号できるのは正しいパスワードのファイルだけなので、順に試しても安全。
   { file: `digital-c${classNo}-main`, makeup: false },
   ...EXAM_CLASS_FILES.filter((n) => n !== classNo).map((n) => ({
     file: `digital-c${n}-main`,
