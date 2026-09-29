@@ -1,6 +1,6 @@
 # JSON送信（校内Node.jsサーバー）
 
-「JSONを保存」に加え、指定したサーバーへ学習記録を送信できます。Windowsでの受信サーバー準備・保存場所・送信手順は [JSON送信の導入手順](local-server/README.md) を参照してください。
+「JSONを保存」に加え、先生PCのIPv4アドレスだけで学習記録を送信できます。提出管理画面は先生PCの `http://localhost:3002/admin` です。Windowsでの受信サーバー準備・保存場所・管理手順は [JSON送信の導入手順](local-server/README.md) を参照してください。
 
 # 情報Ⅰ Digital Lab（2・3年次）
 

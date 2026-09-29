@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DDL 提出管理 | 校内サーバー</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <script src="/admin/admin.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="eyebrow">情報Ⅰ Digital &amp; Data Lab</p><h1>JSON提出管理</h1><p>校内サーバーに届いた学習記録を確認します。</p></div>
+      <span class="badge">先生PC専用</span>
+    </header>
+    <section class="metrics" aria-label="提出状況">
+      <div><span>提出ファイル</span><strong id="file-count">—</strong></div>
+      <div><span>受験番号の数</span><strong id="student-count">—</strong></div>
+      <div><span>再提出のある番号</span><strong id="repeat-count">—</strong></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">
+        <label>受験番号で検索 <input id="query" type="search" inputmode="numeric" placeholder="例：2407" autocomplete="off"></label>
+        <label class="toggle"><input id="latest" type="checkbox" checked> 番号ごとに最新だけ表示</label>
+        <button id="refresh" type="button">更新</button>
+      </div>
+      <div class="toolbar exports">
+        <a href="/api/admin/summary.csv" download>提出一覧CSV</a>
+        <a href="/api/admin/exams.csv" download>分野別テストCSV</a>
+        <span id="shown"></span>
+      </div>
+      <p id="message" role="status" aria-live="polite">読み込み中…</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>受験番号</th><th>受信日時</th><th>総合点</th><th>観点別（％）</th><th>単元完走</th><th>分野別テスト</th><th>再提出</th><th>ファイル</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+    </section>
+    <p class="note">CSVには全提出を含みます。再提出は別ファイルとして保持します。表示している得点は生徒端末から届いた値で、サーバーでの再採点や名簿照合はしていません。元のJSONはサーバーの data フォルダーにも残ります。</p>
+  </main>
+</body>
+</html>

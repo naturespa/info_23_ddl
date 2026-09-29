@@ -1,0 +1,34 @@
+:root { font-family: system-ui, 'Yu Gothic', Meiryo, sans-serif; color: #173046; background: #eef3f8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1400px; margin: auto; padding: 24px; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 24px; }
+h1 { font-size: clamp(1.7rem, 3vw, 2.4rem); margin: 0 0 8px; }
+header p { margin: 0; }
+.eyebrow { color: #336d8b; font-weight: 700; letter-spacing: .05em; }
+.badge { background: #e1f2ec; color: #185745; padding: 10px 16px; border-radius: 999px; white-space: nowrap; }
+.metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-bottom: 20px; }
+.metrics div,.panel { background: white; border: 1px solid #d7e1ea; border-radius: 14px; box-shadow: 0 3px 16px #1c3f6010; }
+.metrics div { padding: 18px 22px; }
+.metrics span { display: block; color: #556c7d; }
+.metrics strong { display: block; font-size: 2rem; padding-top: 6px; }
+.panel { padding: 20px; }
+.toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.toolbar label:not(.toggle) { display: grid; gap: 5px; font-weight: 600; }
+input[type=search] { border: 1px solid #8198ab; border-radius: 8px; padding: 9px; font: inherit; }
+.toggle { padding: 9px 0; }
+button,.exports a { background: #176381; color: white; border: 0; border-radius: 8px; font: inherit; font-weight: 650; padding: 10px 16px; cursor: pointer; text-decoration: none; }
+button:disabled { opacity: .5; }
+.exports { align-items: center; }
+.exports span { margin-left: auto; color: #52697b; }
+#message { min-height: 1.5em; color: #99462d; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 980px; }
+th,td { text-align: left; vertical-align: top; padding: 13px 10px; border-bottom: 1px solid #e1e8ee; }
+th { background: #f4f8fa; white-space: nowrap; }
+td a { color: #165e79; font-weight: 650; white-space: nowrap; }
+td details { margin-top: 5px; }
+td summary { cursor: pointer; color: #165e79; }
+td p { margin: 7px 0; min-width: 230px; }
+.note { color: #52697b; line-height: 1.7; }
+@media(max-width:600px) { main { padding: 14px; } .metrics { grid-template-columns: 1fr 1fr; } header { align-items: start; flex-direction: column; } .panel { padding: 14px; } }

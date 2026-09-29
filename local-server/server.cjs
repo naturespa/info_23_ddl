@@ -3,6 +3,7 @@ const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
+const { FILE_RE, listRecords, summaryCsv, examsCsv } = require('./admin-data.cjs');
 const MAX_BYTES = 2 * 1024 * 1024;
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -20,6 +21,50 @@ function createServer({ dataDir = path.join(__dirname, 'data'), allowedOrigins =
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Vary', 'Origin');
     const reply = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(body)); };
+    const adminPath = req.url === '/admin' || req.url === '/admin/' || req.url?.startsWith('/admin/') || req.url?.startsWith('/api/admin/');
+    if (adminPath) {
+      // IPだけを知る生徒端末には管理APIも管理画面も渡さない。
+      const localPeer = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+      const localHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i.test(req.headers.host || '');
+      if (!localPeer || !localHost) return reply(403, { ok: false, error: 'Administration is available on the server PC only' });
+      if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return reply(403, { ok: false, error: 'Invalid origin' });
+      if (req.method !== 'GET') return reply(405, { ok: false, error: 'GET required' });
+      res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'");
+      try {
+        const file = req.url.match(/^\/api\/admin\/files\/([^/?#]+)$/);
+        if (file) {
+          const name = decodeURIComponent(file[1]);
+          if (!FILE_RE.test(name)) return reply(404, { ok: false, error: 'Not found' });
+          let body;
+          try { body = await fs.readFile(path.join(dataDir, name)); }
+          catch (error) { if (error.code === 'ENOENT') return reply(404, { ok: false, error: 'Not found' }); throw error; }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}"` });
+          return res.end(body);
+        }
+        if (req.url === '/admin' || req.url === '/admin/') {
+          const html = await fs.readFile(path.join(__dirname, 'admin.html'));
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+        if (req.url === '/admin/admin.js' || req.url === '/admin/admin.css') {
+          const script = req.url.endsWith('.js');
+          const body = await fs.readFile(path.join(__dirname, script ? 'admin.js' : 'admin.css'));
+          res.writeHead(200, { 'Content-Type': script ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
+          return res.end(body);
+        }
+        if (req.url === '/api/admin/submissions' || req.url === '/api/admin/summary.csv' || req.url === '/api/admin/exams.csv') {
+          const result = await listRecords(dataDir);
+          if (req.url === '/api/admin/submissions') return reply(200, { ok: true, ...result });
+          const body = req.url.endsWith('summary.csv') ? summaryCsv(result.records) : examsCsv(result.records);
+          res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="ddl-${req.url.endsWith('summary.csv') ? 'summary' : 'exams'}.csv"` });
+          return res.end(body);
+        }
+        return reply(404, { ok: false, error: 'Not found' });
+      } catch (error) {
+        console.error('Admin read failed:', error.code || error.name);
+        return reply(500, { ok: false, error: 'Could not read records' });
+      }
+    }
     const origin = req.headers.origin;
     if (origin && !origins.has(origin)) return reply(403, { ok: false, error: 'Origin not allowed' });
     if (origin) {

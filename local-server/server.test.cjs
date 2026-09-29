@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const http = require('node:http');
 const { createServer } = require('./server.cjs');
 const record = { version: 6, studentCode: '0101', exportedAt: new Date().toISOString(), lastLesson: '', exams: [], examDetails: [] };
 for (const key of ['drafts','submissions','experiments','understanding','wordDrafts','wordSubmissions','missionNotes','boughtHints','practiced','coins','attitude','summary']) record[key] = {};
@@ -48,6 +49,44 @@ test('disk failure must not return a success receipt', async () => {
   try {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(record) });
     assert.equal(response.status, 500); assert.equal((await response.json()).ok, false);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('offline admin lists real submissions, exports CSV and JSON, and rejects nonlocal hosts and origins', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ddl-admin-'));
+  const server = createServer({ dataDir: dir });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const root = `http://127.0.0.1:${server.address().port}`;
+  const value = { ...record, summary: { totalScore: 72, totalMax: 100, perspective: { knowledge: 80, thinking: 70, attitude: 66 }, completedLessons: 8, lessonCount: 10 }, exams: [{ area: 'digital', kind: 'main', setId: '=HYPERLINK("evil")', score: 16, max: 20, rate: 80, finishedAt: record.exportedAt }] };
+  try {
+    const sent = await fetch(root + '/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://naturespa.github.io' }, body: JSON.stringify(value) });
+    assert.equal(sent.status, 201);
+    assert.equal((await fetch(root + '/admin')).status, 200);
+    assert.match(await (await fetch(root + '/admin/admin.js')).text(), /studentCode/);
+    assert.equal((await fetch(root + '/admin/admin.css')).status, 200);
+    const listing = await (await fetch(root + '/api/admin/submissions')).json();
+    assert.equal(listing.records.length, 1);
+    assert.equal(listing.records[0].totalScore, 72);
+    assert.equal(listing.records[0].examCount, 1);
+    const file = listing.records[0].file;
+    assert.deepEqual(await (await fetch(root + `/api/admin/files/${file}`)).json(), value);
+    const summary = await (await fetch(root + '/api/admin/summary.csv')).text();
+    assert.match(summary, /受験番号/); assert.match(summary, /"72"/);
+    const exams = await (await fetch(root + '/api/admin/exams.csv')).text();
+    assert.match(exams, /'\=HYPERLINK/);
+    assert.equal((await fetch(root + '/api/admin/files/..%2fserver.cjs')).status, 404);
+    const nonlocalHost = await new Promise((resolve, reject) => {
+      http.get({ hostname: '127.0.0.1', port: server.address().port, path: '/admin', headers: { Host: '192.168.1.50:3002' } }, response => { response.resume(); resolve(response.statusCode); }).on('error', reject);
+    });
+    assert.equal(nonlocalHost, 403);
+    assert.equal((await fetch(root + '/api/admin/submissions', { headers: { Origin: 'https://naturespa.github.io' } })).status, 403);
+    assert.equal((await fetch(root + '/api/admin/submissions', { method: 'POST' })).status, 405);
+    assert.equal((await fetch(root + '/api/admin/nope')).status, 404);
+    await fs.writeFile(path.join(dir, '0101_2026-09-29T01-01-01-000Z_00000000-0000-0000-0000-000000000000.json'), '{broken');
+    assert.equal((await (await fetch(root + '/api/admin/submissions')).json()).skipped, 1);
   } finally {
     await new Promise(resolve => server.close(resolve));
     await fs.rm(dir, { recursive: true, force: true });
