@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const vm = require('node:vm');
 const { createServer, lanAddresses } = require('./server.cjs');
 const record = { version: 6, studentCode: '0101', exportedAt: new Date().toISOString(), lastLesson: '', exams: [], examDetails: [] };
 for (const key of ['drafts','submissions','experiments','understanding','wordDrafts','wordSubmissions','missionNotes','boughtHints','practiced','coins','attitude','summary']) record[key] = {};
@@ -114,4 +115,31 @@ test('LAN display lists all usable IPv4 interfaces without loopback or link-loca
     { interfaceName: 'Ethernet', address: '192.168.88.13' },
     { interfaceName: 'WiFi', address: '172.20.10.2' }
   ]);
+});
+
+test('opening admin.html as a file guides and redirects to the local server', async () => {
+  const html = await fs.readFile(path.join(__dirname, 'admin.html'), 'utf8');
+  const script = html.match(/<script nonce="__DDL_NONCE__">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  const elements = new Map();
+  const get = id => {
+    if (!elements.has(id)) elements.set(id, {
+      textContent: '', children: [], disabled: false,
+      addEventListener() {}, replaceChildren() { this.children = []; },
+      append(child) { this.children.push(child); }
+    });
+    return elements.get(id);
+  };
+  const location = { protocol: 'file:', replaced: null, replace(url) { this.replaced = url; } };
+  let scheduled;
+  vm.runInNewContext(script, {
+    document: { getElementById: get, querySelectorAll: () => [], createElement: () => ({}) },
+    location, setTimeout: callback => { scheduled = callback; }
+  });
+  assert.equal(get('addresses').children[0].href, 'http://localhost:3002/admin');
+  assert.notEqual(get('addresses').children[0].textContent, 'IPアドレスを取得中…');
+  assert.match(get('message').textContent, /直接開いています/);
+  assert.equal(get('refresh').disabled, true);
+  scheduled();
+  assert.equal(location.replaced, 'http://localhost:3002/admin');
 });

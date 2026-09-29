@@ -148,10 +148,18 @@ $('refresh').addEventListener('click',()=>{loadRecords();loadNetwork();});
 $('close').addEventListener('click',()=>$('detail-dialog').close());
 $('detail-dialog').addEventListener('click',e=>{if(e.target===$('detail-dialog'))$('detail-dialog').close();});
 if(location.protocol==='file:'){
-  $('message').textContent='HTMLファイルを直接開いています。先生PCで node server.cjs を起動し、ブラウザで http://localhost:3002/admin を開いてください。';
-  $('network-hint').textContent='サーバーを起動して管理画面のURLを開くと、ここにIPアドレスが表示されます。';
-  $('empty-text').textContent='管理画面は http://localhost:3002/admin から開いてください。';
+  const url='http://localhost:3002/admin';
+  $('addresses').replaceChildren();
+  const link=document.createElement('a');
+  link.href=url;
+  link.className='modal-download';
+  link.textContent='管理画面を開く →';
+  $('addresses').append(link);
+  $('message').textContent='HTMLファイルを直接開いています。管理画面のURLへ移動します。移動しない場合は上の「管理画面を開く」を押してください。';
+  $('network-hint').textContent='正しいURL: '+url+'　起動中のサーバーからIPアドレスと提出データを取得します。';
+  $('empty-text').textContent='管理画面のURLから開くと提出データが表示されます。';
   $('refresh').disabled=true;
+  setTimeout(()=>location.replace(url),800);
 }else{loadRecords();loadNetwork();}
 </script>
 </body></html>
