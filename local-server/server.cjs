@@ -3,7 +3,68 @@ const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
-const { FILE_RE, listRecords, summaryCsv, examsCsv } = require('./admin-data.cjs');
+const os = require('node:os');
+
+const FILE_RE = /^(\d{4})_(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z)_([0-9a-f-]{36})\.json$/i;
+
+async function listRecords(dataDir) {
+  let names;
+  try { names = await fs.readdir(dataDir); }
+  catch (error) { if (error.code === 'ENOENT') return { records: [], skipped: 0 }; throw error; }
+  const records = [];
+  let skipped = 0;
+  for (const name of names) {
+    const match = FILE_RE.exec(name);
+    if (!match) continue;
+    try {
+      const value = JSON.parse(await fs.readFile(path.join(dataDir, name), 'utf8'));
+      if (value.version !== 6 || value.studentCode !== match[1]) throw new Error('Unexpected record');
+      const summary = value.summary ?? {};
+      const perspective = summary.perspective ?? {};
+      records.push({
+        file: name, studentCode: value.studentCode, receivedAt: match[2].replace(/^(\d{4}-\d\d-\d\d)T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, '$1T$2:$3:$4.$5Z'),
+        receiptId: match[3], exportedAt: value.exportedAt,
+        totalScore: summary.totalScore ?? null, totalMax: summary.totalMax ?? null,
+        knowledge: perspective.knowledge ?? null, thinking: perspective.thinking ?? null, attitude: perspective.attitude ?? null,
+        completedLessons: summary.completedLessons ?? null, lessonCount: summary.lessonCount ?? null,
+        examCount: Array.isArray(value.exams) ? value.exams.length : 0,
+        exams: Array.isArray(value.exams) ? value.exams.map(exam => ({ area: exam.area, kind: exam.kind, setId: exam.setId, score: exam.score, max: exam.max, rate: exam.rate, finishedAt: exam.finishedAt })) : []
+      });
+    } catch { skipped += 1; }
+  }
+  records.sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.file.localeCompare(a.file));
+  return { records, skipped };
+}
+
+function csvCell(value) {
+  const text = value == null ? '' : String(value);
+  // Excel等で開く場合に、CSV由来の式として実行されないようにする。
+  const safe = /^[\s\u0000-\u001f]*[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safe.replaceAll('"', '""')}"`;
+}
+function csv(rows) { return '\ufeff' + rows.map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n'; }
+function summaryCsv(records) {
+  return csv([
+    ['受験番号','受信日時(UTC)','送信日時','受付番号','総合点','満点','知識・技能(%)','思考・判断・表現(%)','主体的態度(%)','完走単元','全単元','分野別テスト件数','保存ファイル'],
+    ...records.map(r => [r.studentCode,r.receivedAt,r.exportedAt,r.receiptId,r.totalScore,r.totalMax,r.knowledge,r.thinking,r.attitude,r.completedLessons,r.lessonCount,r.examCount,r.file])
+  ]);
+}
+function examsCsv(records) {
+  return csv([
+    ['受験番号','受信日時(UTC)','受付番号','分野','種類','セットID','得点','満点','得点率','テスト終了日時','保存ファイル'],
+    ...records.flatMap(r => r.exams.map(e => [r.studentCode,r.receivedAt,r.receiptId,e.area,e.kind,e.setId,e.score,e.max,e.rate,e.finishedAt,r.file]))
+  ]);
+}
+
+function lanAddresses(interfaces) {
+  if (!interfaces) {
+    try { interfaces = os.networkInterfaces(); }
+    catch (error) { console.error('LAN address lookup failed:', error.code || error.name); return []; }
+  }
+  return Object.entries(interfaces).flatMap(([interfaceName, values]) => (values || [])
+    .filter(item => item.family === 'IPv4' && !item.internal && !item.address.startsWith('169.254.'))
+    .map(item => ({ interfaceName, address: item.address })));
+}
 const MAX_BYTES = 2 * 1024 * 1024;
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -16,7 +77,7 @@ function validRecord(record) {
 
 function createServer({ dataDir = path.join(__dirname, 'data'), allowedOrigins = ['https://naturespa.github.io'] } = {}) {
   const origins = new Set(allowedOrigins);
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Vary', 'Origin');
@@ -29,7 +90,6 @@ function createServer({ dataDir = path.join(__dirname, 'data'), allowedOrigins =
       if (!localPeer || !localHost) return reply(403, { ok: false, error: 'Administration is available on the server PC only' });
       if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return reply(403, { ok: false, error: 'Invalid origin' });
       if (req.method !== 'GET') return reply(405, { ok: false, error: 'GET required' });
-      res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'");
       try {
         const file = req.url.match(/^\/api\/admin\/files\/([^/?#]+)$/);
         if (file) {
@@ -42,16 +102,13 @@ function createServer({ dataDir = path.join(__dirname, 'data'), allowedOrigins =
           return res.end(body);
         }
         if (req.url === '/admin' || req.url === '/admin/') {
-          const html = await fs.readFile(path.join(__dirname, 'admin.html'));
+          const nonce = randomUUID();
+          const html = (await fs.readFile(path.join(__dirname, 'admin.html'), 'utf8')).replaceAll('__DDL_NONCE__', nonce);
+          res.setHeader('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'`);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
-        if (req.url === '/admin/admin.js' || req.url === '/admin/admin.css') {
-          const script = req.url.endsWith('.js');
-          const body = await fs.readFile(path.join(__dirname, script ? 'admin.js' : 'admin.css'));
-          res.writeHead(200, { 'Content-Type': script ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
-          return res.end(body);
-        }
+        if (req.url === '/api/admin/network') return reply(200, { ok: true, addresses: lanAddresses(), port: server.address()?.port ?? null });
         if (req.url === '/api/admin/submissions' || req.url === '/api/admin/summary.csv' || req.url === '/api/admin/exams.csv') {
           const result = await listRecords(dataDir);
           if (req.url === '/api/admin/submissions') return reply(200, { ok: true, ...result });
@@ -103,6 +160,7 @@ function createServer({ dataDir = path.join(__dirname, 'data'), allowedOrigins =
       if (!res.headersSent && !res.destroyed) reply(500, { ok: false, error: 'Could not save record' });
     }
   });
+  return server;
 }
 
 if (require.main === module) {
@@ -114,7 +172,15 @@ if (require.main === module) {
   server.requestTimeout = 30000;
   server.on('error', error => { console.error(`Server error: ${error.code}`); process.exitCode = 1; });
   server.listen(port, process.env.HOST || '0.0.0.0', () => {
-    console.log(`DDL JSON receiver: port ${port}\nSave folder: ${dataDir}\nAllowed origins: ${allowedOrigins.join(', ')}\nStop: Ctrl+C`);
+    console.log(`管理画面（先生PC） http://localhost:${port}/admin`);
+    console.log(`接続テスト（先生PC） http://localhost:${port}/health`);
+    const addresses = lanAddresses();
+    for (const item of addresses) {
+      console.log(`生徒に伝えるIP（${item.interfaceName}） ${item.address}`);
+      console.log(`接続テスト（LAN） http://${item.address}:${port}/health`);
+    }
+    if (!addresses.length) console.log('LANのIPv4アドレスが見つかりません。ネットワーク接続を確認してください。');
+    console.log(`保存先 ${dataDir}\n終了 Ctrl+C`);
   });
 }
-module.exports = { createServer, validRecord };
+module.exports = { createServer, validRecord, lanAddresses };

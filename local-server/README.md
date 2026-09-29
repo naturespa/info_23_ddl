@@ -5,7 +5,7 @@
 ## 1. 先生側：受信サーバーを準備する（Windows）
 
 1. Node.js 22以降をインストールした校内の受信用PCを用意します。
-2. このリポジトリの `local-server` 内の `server.cjs`、`admin-data.cjs`、`admin.html`、`admin.js`、`admin.css`、`start.bat` を `C:\ddl-json` にコピーします。既存の `C:\cbt` とは別のフォルダーです。
+2. このリポジトリの `local-server` 内の `server.cjs` と `admin.html`（必要ならダブルクリック起動用の `start.bat` も） を `C:\ddl-json` にコピーします。既存の `C:\cbt` とは別のフォルダーです。
 3. コマンドプロンプトを開いて実行します。追加のnpmインストールは不要です。
 
 ```bat
@@ -14,10 +14,10 @@ node --version
 node server.cjs
 ```
 
-`start.bat` のダブルクリックでも起動できます。終了するまでウィンドウを開いておきます。終了は Ctrl+C。再起動後はもう一度起動してください。
+`start.bat` のダブルクリックでも起動できます。終了するまでウィンドウを開いておきます。終了は Ctrl+C。再起動後はもう一度起動してください。`server.cjs` の cjs はNode.jsのスクリプト形式であり、IP表示の可否とは関係ありません。
 
-4. 同じPCのブラウザで `http://localhost:3002/health` を開き、`"ok":true` を確認します。
-5. コマンドプロンプトで `ipconfig` を実行し、校内LANのIPv4アドレスを確認します。例えば `192.168.1.50` なら、生徒へ伝えるのは **`192.168.1.50` だけ**です。3002番はサイトが自動で付けます。生徒PCでlocalhostと入力すると、生徒PC自身を指してしまいます。
+4. 起動したコマンドプロンプトに **「管理画面（先生PC）」と「生徒に伝えるIP」** が表示されます。同じ情報を `http://localhost:3002/admin` の上部でも確認できます。
+5. 同じPCで `http://localhost:3002/health` を開き、`"ok":true` を確認します。IPが例えば `192.168.1.50` なら、生徒へ伝えるのは **`192.168.1.50` だけ**です。3002番はサイトが自動で付けます。複数表示される場合は、生徒PCと同じ校内ネットワークに接続した方を使います。生徒PCでlocalhostと入力すると、生徒PC自身を指してしまいます。
 6. 学校の管理方針に従って、受信用PCのTCP 3002番へ校内の生徒端末から接続できるよう設定します。固定IPまたはDHCP予約を利用すると送信先が変わりません。
 
 pycbtの3000番、HTML収集の3001番と分けるため、既定は3002番です。提出管理画面は受信用PCの `http://localhost:3002/admin` で開きます。インターネットは不要です。
@@ -32,13 +32,14 @@ pycbtの3000番、HTML収集の3001番と分けるため、既定は3002番で�
 
 ## 3. 先生側：提出を確認する（オフライン管理画面）
 
-受信用PCで `node server.cjs` を起動したまま、**同じPCのブラウザで** `http://localhost:3002/admin` を開きます。学校のインターネットに接続しなくても、保存済みデータを読めます。pycbtの `/admin` とは別の管理画面です。
+受信用PCで `node server.cjs` を起動したまま、**同じPCのブラウザのアドレス欄に** `http://localhost:3002/admin` を入力して開きます。`admin.html` をダブルクリックして開くと提出データは読み込めません。学校のインターネットに接続しなくても、保存済みデータを読めます。pycbtの `/admin` とは別の管理画面です。
 
+- 画面上部に先生PCのLANのIPアドレスが表示され、コピーできます。複数表示される場合は生徒PCと同じネットワークのIPを選びます。
 - 提出ファイル数、受験番号の数、再提出のある番号を確認できます。
-- 受験番号で検索し、標準では各番号の最新提出を表示します。チェックを外すと過去の提出も確認できます。画面の「更新」で新着提出を読み込みます。
+- 受験番号やクラスで絞り込み、標準では各番号の最新提出を表示します。「全提出」で過去の提出も確認できます。画面の「更新」で新着提出を読み込みます。
 - 総合点、観点別の到達度、単元完走、分野別テストの得点を確認できます。これらは端末が計算した値です。
 - 「提出一覧CSV」「分野別テストCSV」は**全提出**を出力します。再提出を含むため、集計時に受付番号・受信日時を確認してください。Excelで開けるUTF-8 BOM付きです。
-- 各行の「JSONを保存」で提出時の元データをダウンロードできます。管理画面に削除機能はありません。バックアップは停止中の `data` フォルダーを学校の管理方針に従ってコピーします。
+- 各行の「詳細を見る」から提出時刻や分野別テスト得点を確認し、「元のJSONを保存」でダウンロードできます。管理画面に削除機能はありません。バックアップは停止中の `data` フォルダーを学校の管理方針に従ってコピーします。
 
 管理画面とそのデータAPIは、受信用PC自身から `localhost` / `127.0.0.1` を使った場合だけ利用できます。生徒PCには管理画面を公開しません。受信用PCのログイン権限・画面ロックは学校の運用に従って管理してください。
 
@@ -84,7 +85,8 @@ node server.cjs
 - `POST /api/submissions`、Content-Type application/json。本文はStudentRecordそのもの（ラッパーなし）。
 - 保存完了後にHTTP 201と `{ok:true, studentCode, receiptId, receivedAt}` を返す。
 - 400=不正JSON/形式、403=許可外Origin、413=容量超過、415=Content-Type不正、500=保存エラー。
-- `GET /health` は稼働確認。先生PC限定で `GET /admin`、`GET /api/admin/submissions`、`GET /api/admin/summary.csv`、`GET /api/admin/exams.csv`、`GET /api/admin/files/:filename` を提供。削除APIは設けない。
+- `GET /health` は稼働確認。先生PC限定で `GET /admin`、`GET /api/admin/network`、`GET /api/admin/submissions`、`GET /api/admin/summary.csv`、`GET /api/admin/exams.csv`、`GET /api/admin/files/:filename` を提供。削除APIは設けない。
 - 自動テスト: リポジトリ直下で `node --test local-server/server.test.cjs`。
 - サイトのビルド: `npm ci` の後、Windowsでは `set GITHUB_PAGES=true`、次に `npm run build`。
+- 管理画面のHTMLに装飾と動作コードを内包。更新時にコピーするのは `server.cjs` と `admin.html` の2ファイルです。旧 `admin-data.cjs`、`admin.css`、`admin.js` は新版では使用しません。
 - 学校の実ネットワーク・管理ブラウザからの送信確認は導入時に別途実施する。

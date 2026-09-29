@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { createServer } = require('./server.cjs');
+const { createServer, lanAddresses } = require('./server.cjs');
 const record = { version: 6, studentCode: '0101', exportedAt: new Date().toISOString(), lastLesson: '', exams: [], examDetails: [] };
 for (const key of ['drafts','submissions','experiments','understanding','wordDrafts','wordSubmissions','missionNotes','boughtHints','practiced','coins','attitude','summary']) record[key] = {};
 
@@ -64,9 +64,19 @@ test('offline admin lists real submissions, exports CSV and JSON, and rejects no
   try {
     const sent = await fetch(root + '/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://naturespa.github.io' }, body: JSON.stringify(value) });
     assert.equal(sent.status, 201);
-    assert.equal((await fetch(root + '/admin')).status, 200);
-    assert.match(await (await fetch(root + '/admin/admin.js')).text(), /studentCode/);
-    assert.equal((await fetch(root + '/admin/admin.css')).status, 200);
+    const admin = await fetch(root + '/admin');
+    assert.equal(admin.status, 200);
+    const html = await admin.text();
+    assert.match(html, /<style nonce="[0-9a-f-]+">/);
+    assert.match(html, /<script nonce="[0-9a-f-]+">/);
+    assert.match(html, /生徒に伝えるIPアドレス/);
+    assert.doesNotMatch(html, /admin\.css|admin\.js|__DDL_NONCE__/);
+    assert.match(admin.headers.get('content-security-policy'), /script-src 'nonce-/);
+    assert.equal((await fetch(root + '/admin/admin.js')).status, 404);
+    const network = await (await fetch(root + '/api/admin/network')).json();
+    assert.equal(network.ok, true);
+    assert.equal(network.port, server.address().port);
+    assert.ok(Array.isArray(network.addresses));
     const listing = await (await fetch(root + '/api/admin/submissions')).json();
     assert.equal(listing.records.length, 1);
     assert.equal(listing.records[0].totalScore, 72);
@@ -83,6 +93,7 @@ test('offline admin lists real submissions, exports CSV and JSON, and rejects no
     });
     assert.equal(nonlocalHost, 403);
     assert.equal((await fetch(root + '/api/admin/submissions', { headers: { Origin: 'https://naturespa.github.io' } })).status, 403);
+    assert.equal((await fetch(root + '/api/admin/network', { headers: { Origin: 'https://naturespa.github.io' } })).status, 403);
     assert.equal((await fetch(root + '/api/admin/submissions', { method: 'POST' })).status, 405);
     assert.equal((await fetch(root + '/api/admin/nope')).status, 404);
     await fs.writeFile(path.join(dir, '0101_2026-09-29T01-01-01-000Z_00000000-0000-0000-0000-000000000000.json'), '{broken');
@@ -91,4 +102,16 @@ test('offline admin lists real submissions, exports CSV and JSON, and rejects no
     await new Promise(resolve => server.close(resolve));
     await fs.rm(dir, { recursive: true, force: true });
   }
+});
+
+test('LAN display lists all usable IPv4 interfaces without loopback or link-local', () => {
+  assert.deepEqual(lanAddresses({
+    Ethernet: [{ family: 'IPv4', address: '192.168.88.13', internal: false }],
+    WiFi: [{ family: 'IPv4', address: '172.20.10.2', internal: false }],
+    Loopback: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    Disconnected: [{ family: 'IPv4', address: '169.254.1.2', internal: false }]
+  }), [
+    { interfaceName: 'Ethernet', address: '192.168.88.13' },
+    { interfaceName: 'WiFi', address: '172.20.10.2' }
+  ]);
 });
