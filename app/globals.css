@@ -7607,3 +7607,9 @@ body.exam-locked footer {
   overflow: visible;
   text-overflow: clip;
 }
+
+/* 学習記録の手動送信 */
+.json-submit { margin-top: 24px; padding: 20px; border: 1px solid #b8c5d1; border-radius: 12px; }
+.json-submit label { display: block; margin-bottom: 8px; font-weight: 700; }
+.json-submit input { flex: 1 1 260px; min-width: 0; max-width: 100%; padding: 10px; font: inherit; }
+.json-submit [role="status"] { overflow-wrap: anywhere; }

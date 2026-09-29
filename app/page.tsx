@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { JsonSubmit } from "./lib/json-submit";
 import { ExamView } from "./exam";
 import { Experiments } from "./experiments";
 import { QuestionFigure } from "./lib/question-figures";
@@ -921,7 +922,7 @@ export default function Home() {
           <div className="demo-banner" role="status">
             <b>デモ・動作確認モード</b>
             <span>
-              この番号（{DEMO_CODE}）で触った内容は<b>いっさい保存されません</b>。
+              この番号（{DEMO_CODE}）で触った内容は<b>ブラウザに自動保存されません</b>。JSON保存・JSON送信は手動で実行できます。
               画面を再読み込みすると、まっさらな状態に戻ります。分野別テストは<b>デモ用の20問・10分</b>です。
             </span>
           </div>
@@ -2027,13 +2028,14 @@ export default function Home() {
                 {studentCode.length === 4 ? `保存ファイル名: ${studentCode}_ddl_${todayNumber()}.json` : "4桁番号を入力するとJSON出力できます。"}
               </span>
             </div>
+            <JsonSubmit studentCode={studentCode} buildRecord={buildRecord} />
           </section>
         )}
       </div>
       <footer>
         {isDemoCode(studentCode)
-          ? "デモ・動作確認用の番号なので、学習履歴と得点は保存されません。氏名・名簿データも含みません。"
-          : "学習履歴と得点は使用中のブラウザに保存されます。氏名・名簿データは含みません。"}
+          ? "デモ番号の記録はブラウザに自動保存されません。JSON保存・JSON送信は手動で実行できます。氏名・名簿データは含みません。"
+          : "学習履歴と得点は使用中のブラウザに保存されます。JSON送信すると指定サーバーにも保存されます。氏名・名簿データは含みません。"}
         <br />
         単元構成は岡田メソッド（兵庫県立明石南高等学校 岡田）のExcelシートに対応しています。掲載した過去問題の著作権はIPA（情報処理推進機構）に帰属します。
       </footer>
